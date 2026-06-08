@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+html, body, #root {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: #f7f7f7;
+  color: #515d6d;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f7f7f7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Thin scrollbar for TOC */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Markdown content styles */
+.markdown-content {
+  @apply text-text-secondary leading-relaxed;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* 强制所有子元素不溢出 */
+.markdown-content * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.markdown-content h1 {
+  @apply text-[28px] font-medium text-text-primary border-b border-divider pb-4 mb-6;
+}
+
+.markdown-content h2 {
+  @apply text-[22px] font-medium text-text-primary mt-8 mb-4;
+}
+
+.markdown-content h3 {
+  @apply text-[18px] font-medium text-text-primary mt-6 mb-3;
+}
+
+
+.markdown-content code:not(pre code) {
+  @apply bg-surface-alt text-text-primary px-1.5 py-0.5 rounded text-sm;
+}
+
+.markdown-content pre {
+  @apply bg-[#2d3748] text-[#e2e8f0] rounded-md p-4 my-4;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-content pre code {
+  @apply font-mono text-sm;
+  white-space: pre;
+  max-width: none; /* pre 内部允许横向滚动 */
+}
+
+/* 图片自适应 */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+/* 表格溢出保护 */
+.markdown-content table {
+  @apply border-collapse my-4;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* 长 URL / 长文本保护 */
+.markdown-content a {
+  @apply text-accent hover:underline;
+  word-break: break-all;
+}
+
+.markdown-content p {
+  @apply mb-4;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 原始 HTML 块保护 */
+.markdown-content div,
+.markdown-content section,
+.markdown-content picture,
+.markdown-content figure,
+.markdown-content source {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* 内联 HTML 居中段落（shields 徽章等） */
+.markdown-content p[align="center"] {
+  text-align: center;
+}
+
+.markdown-content p img {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* 居中图片 */
+.markdown-content p[align="center"] img {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 4px;
+}
+
+.markdown-content blockquote {
+  @apply border-l-[3px] border-accent bg-surface-alt pl-4 py-3 my-4 text-text-muted;
+}
+
+.markdown-content ul, .markdown-content ol {
+  @apply pl-6 mb-4;
+}
+
+.markdown-content li {
+  @apply mb-2;
+}
+
+
+.markdown-content th, .markdown-content td {
+  @apply border border-border px-4 py-2 text-left;
+}
+
+.markdown-content th {
+  @apply bg-surface-alt font-medium;
+}
+
+/* Code highlighting */
+.hljs {
+  background: #2d3748 !important;
+}
