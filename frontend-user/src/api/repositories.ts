@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { Repository, CreateRepositoryRequest, TreeNode, DocumentContent, SearchResponse } from '../types'
+import type { Repository, CreateRepositoryRequest, TreeNode, DocumentContent, SearchResponse, ReadingProgress, ReadingProgressGetResponse, SaveReadingProgressRequest } from '../types'
 
 // Repository APIs
 export const getRepositories = async (): Promise<Repository[]> => {
@@ -59,6 +59,23 @@ export const exportDocument = async (repoId: number, filepath: string): Promise<
 export const exportRepository = async (repoId: number): Promise<Blob> => {
   const response = await apiClient.get(`/repositories/${repoId}/export-all`, {
     responseType: 'blob'
+  })
+  return response.data
+}
+
+// Reading Progress APIs
+export const saveReadingProgress = async (data: SaveReadingProgressRequest): Promise<ReadingProgress> => {
+  const response = await apiClient.put('/reading-progress', data)
+  return response.data
+}
+
+export const getReadingProgress = async (
+  sessionId: string,
+  repoId: number,
+  filepath: string
+): Promise<ReadingProgressGetResponse | null> => {
+  const response = await apiClient.get('/reading-progress', {
+    params: { session_id: sessionId, repository_id: repoId, filepath }
   })
   return response.data
 }
