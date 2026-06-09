@@ -1,6 +1,7 @@
 """Document service for scanning and managing documents."""
 import os
 import re
+import hashlib
 import logging
 from pathlib import Path
 from typing import Optional
@@ -69,8 +70,8 @@ class DocumentService:
                 
                 # Extract title from content (first heading)
                 title = self._extract_title(filepath)
-                
-                # Create document record
+                content_hash = self._compute_content_hash(filepath)
+
                 doc = Document(
                     repository_id=repository.id,
                     filename=filename,
@@ -78,6 +79,7 @@ class DocumentService:
                     extension=extension,
                     title=title,
                     size=size,
+                    content_hash=content_hash,
                     is_indexed=False
                 )
                 db.add(doc)
@@ -114,7 +116,15 @@ class DocumentService:
             logger.debug(f"Failed to extract title from {filepath}: {e}")
         
         return None
-    
+
+    def _compute_content_hash(self, filepath: Path) -> Optional[str]:
+        try:
+            content = filepath.read_bytes()
+            return hashlib.md5(content).hexdigest()
+        except Exception as e:
+            logger.debug(f"Failed to compute hash for {filepath}: {e}")
+            return None
+
     def get_document_tree(
         self, 
         repository: Repository

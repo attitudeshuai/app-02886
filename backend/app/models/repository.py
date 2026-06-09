@@ -42,6 +42,7 @@ class Document(Base):
     extension = Column(String(20), nullable=False)
     title = Column(String(255), nullable=True)
     size = Column(Integer, default=0)
+    content_hash = Column(String(32), nullable=True)
     is_indexed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
