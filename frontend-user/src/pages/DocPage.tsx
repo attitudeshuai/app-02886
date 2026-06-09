@@ -6,10 +6,25 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSlug from 'rehype-slug'
 import remarkGfm from 'remark-gfm'
-import { getDocumentContent, exportDocument } from '../api/repositories'
+import { getDocumentContent, exportDocument, getReadingProgress, saveReadingProgress } from '../api/repositories'
 import type { DocumentContent } from '../types'
 import { saveAs } from 'file-saver'
 import 'highlight.js/styles/github-dark.css'
+
+const SESSION_STORAGE_KEY = 'reader_session_id'
+
+const generateSessionId = (): string => {
+  return 'session_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10)
+}
+
+const getSessionId = (): string => {
+  let sessionId = localStorage.getItem(SESSION_STORAGE_KEY)
+  if (!sessionId) {
+    sessionId = generateSessionId()
+    localStorage.setItem(SESSION_STORAGE_KEY, sessionId)
+  }
+  return sessionId
+}
 
 interface TocItem {
   id: string
@@ -25,6 +40,7 @@ export default function DocPage() {
   const [toc, setToc] = useState<TocItem[]>([])
   const [activeId, setActiveId] = useState<string>('')
   const [contentRendered, setContentRendered] = useState(false)
+  const [hasRestoredProgress, setHasRestoredProgress] = useState(false)
   
   const contentRef = useRef<HTMLDivElement>(null)
   const tocRef = useRef<HTMLDivElement>(null)
@@ -35,11 +51,16 @@ export default function DocPage() {
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Observer 累积的可见标题集合（提升为 ref 以便清空）
   const visibleIdsRef = useRef(new Set<string>())
+  // 阅读进度相关
+  const sessionIdRef = useRef<string>(getSessionId())
+  const saveProgressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isRestoringProgress = useRef(false)
 
   // 清理
   useEffect(() => {
     return () => {
       if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+      if (saveProgressTimer.current) clearTimeout(saveProgressTimer.current)
       observerRef.current?.disconnect()
     }
   }, [])
@@ -52,6 +73,10 @@ export default function DocPage() {
       setActiveId('')
       setToc([])
       setContentRendered(false)
+      setHasRestoredProgress(false)
+      isRestoringProgress.current = false
+      // 滚动到顶部，等待恢复进度
+      window.scrollTo({ top: 0, behavior: 'auto' })
       try {
         const data = await getDocumentContent(Number(repoId), filepath)
         setDoc(data)
@@ -85,6 +110,41 @@ export default function DocPage() {
     })
     return () => cancelAnimationFrame(raf)
   }, [contentRendered])
+
+  // 恢复阅读进度
+  useEffect(() => {
+    if (!contentRendered || !repoId || !filepath || hasRestoredProgress) return
+
+    const restoreProgress = async () => {
+      try {
+        const progress = await getReadingProgress(
+          Number(repoId),
+          filepath,
+          sessionIdRef.current
+        )
+
+        if (progress && progress.scroll_position > 0) {
+          isRestoringProgress.current = true
+          const doc = document.documentElement
+          const maxScroll = doc.scrollHeight - doc.clientHeight
+          const targetY = maxScroll * progress.scroll_position
+          window.scrollTo({ top: targetY, behavior: 'auto' })
+          
+          setTimeout(() => {
+            isRestoringProgress.current = false
+            setHasRestoredProgress(true)
+          }, 100)
+        } else {
+          setHasRestoredProgress(true)
+        }
+      } catch (error) {
+        console.error('Failed to restore reading progress:', error)
+        setHasRestoredProgress(true)
+      }
+    }
+
+    restoreProgress()
+  }, [contentRendered, repoId, filepath])
 
   // ========== Intersection Observer ==========
   useEffect(() => {
@@ -192,6 +252,46 @@ export default function DocPage() {
 
     if (bestId) setActiveId(bestId)
   }, [])
+
+  // ========== 保存阅读进度 ==========
+  const saveProgress = useCallback(() => {
+    if (!repoId || !filepath || !hasRestoredProgress || isRestoringProgress.current) return
+
+    const scrollTop = window.scrollY
+    const doc = document.documentElement
+    const maxScroll = doc.scrollHeight - doc.clientHeight
+    const scrollPosition = maxScroll > 0 ? Math.min(1, Math.max(0, scrollTop / maxScroll)) : 0
+
+    if (saveProgressTimer.current) {
+      clearTimeout(saveProgressTimer.current)
+    }
+
+    saveProgressTimer.current = setTimeout(async () => {
+      try {
+        await saveReadingProgress(
+          Number(repoId),
+          filepath,
+          sessionIdRef.current,
+          scrollPosition
+        )
+      } catch (error) {
+        console.error('Failed to save reading progress:', error)
+      }
+    }, 500)
+  }, [repoId, filepath, hasRestoredProgress])
+
+  // 监听滚动事件，保存进度
+  useEffect(() => {
+    if (!hasRestoredProgress) return
+
+    const handleScroll = () => {
+      if (isRestoringProgress.current) return
+      saveProgress()
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [hasRestoredProgress, saveProgress])
 
   // ========== 点击 TOC 跳转 ==========
   const handleTocClick = useCallback((id: string) => {

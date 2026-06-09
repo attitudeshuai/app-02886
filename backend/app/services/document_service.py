@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.repository import Repository, Document
 from app.schemas.document import TreeNode
+from app.services.reading_progress_service import reading_progress_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class DocumentService:
     ) -> int:
         """
         Scan repository for document files and save to database.
+        Only resets reading progress for documents that actually changed.
         
         Returns:
             Number of documents found
@@ -38,10 +40,15 @@ class DocumentService:
             logger.error(f"Repository path does not exist: {local_path}")
             return 0
         
-        # Clear existing documents
-        db.query(Document).filter(Document.repository_id == repository.id).delete()
+        # Get existing documents from DB
+        existing_docs = db.query(Document).filter(
+            Document.repository_id == repository.id
+        ).all()
+        existing_doc_map = {doc.filepath: doc for doc in existing_docs}
         
-        doc_count = 0
+        # Collect new documents from filesystem
+        new_docs = []
+        changed_filepaths = set()
         
         for root, dirs, files in os.walk(local_path):
             # Skip hidden directories and common non-doc directories
@@ -66,30 +73,53 @@ class DocumentService:
                 
                 # Get relative path
                 rel_path = filepath.relative_to(local_path)
+                rel_path_str = str(rel_path)
                 
                 # Extract title from content (first heading)
                 title = self._extract_title(filepath)
+                
+                # Check if document changed (by size for now, could add hash for more accuracy)
+                existing = existing_doc_map.get(rel_path_str)
+                if not existing or existing.size != size:
+                    changed_filepaths.add(rel_path_str)
                 
                 # Create document record
                 doc = Document(
                     repository_id=repository.id,
                     filename=filename,
-                    filepath=str(rel_path),
+                    filepath=rel_path_str,
                     extension=extension,
                     title=title,
                     size=size,
                     is_indexed=False
                 )
-                db.add(doc)
-                doc_count += 1
+                new_docs.append(doc)
+        
+        # Delete old documents
+        db.query(Document).filter(Document.repository_id == repository.id).delete()
+        
+        # Add new documents
+        for doc in new_docs:
+            db.add(doc)
         
         db.commit()
+        
+        # Reset reading progress only for changed documents
+        for filepath in changed_filepaths:
+            reading_progress_service.delete_progress_for_document(
+                db, repository.id, filepath
+            )
+        
+        doc_count = len(new_docs)
         
         # Update repository doc count
         repository.doc_count = doc_count
         db.commit()
         
-        logger.info(f"Scanned {doc_count} documents for repository {repository.name}")
+        logger.info(
+            f"Scanned {doc_count} documents for repository {repository.name}. "
+            f"{len(changed_filepaths)} documents changed, progress reset."
+        )
         return doc_count
     
     def _extract_title(self, filepath: Path) -> Optional[str]:

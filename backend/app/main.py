@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import repositories, search, export
+from app.routers import repositories, search, export, reading_progress
 
 # Configure logging
 logging.basicConfig(
@@ -77,3 +77,4 @@ async def root():
 app.include_router(repositories.router)
 app.include_router(search.router)
 app.include_router(export.router)
+app.include_router(reading_progress.router)
