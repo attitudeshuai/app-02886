@@ -1,5 +1,13 @@
 import apiClient from './client'
-import type { Repository, CreateRepositoryRequest, TreeNode, DocumentContent, SearchResponse } from '../types'
+import type {
+  Repository,
+  CreateRepositoryRequest,
+  TreeNode,
+  DocumentContent,
+  SearchResponse,
+  ReadingProgress,
+  ReadingProgressGetResponse,
+} from '../types'
 
 // Repository APIs
 export const getRepositories = async (): Promise<Repository[]> => {
@@ -60,5 +68,42 @@ export const exportRepository = async (repoId: number): Promise<Blob> => {
   const response = await apiClient.get(`/repositories/${repoId}/export-all`, {
     responseType: 'blob'
   })
+  return response.data
+}
+
+// Reading progress APIs
+export const getReadingProgress = async (
+  repoId: number,
+  sessionId: string,
+  filepath: string,
+): Promise<ReadingProgressGetResponse> => {
+  const response = await apiClient.get(
+    `/repositories/${repoId}/reading-progress`,
+    {
+      params: { filepath },
+      headers: { 'X-Session-Id': sessionId },
+    },
+  )
+  return response.data
+}
+
+export const saveReadingProgress = async (
+  repoId: number,
+  sessionId: string,
+  filepath: string,
+  scrollRatio: number,
+  scrollTop: number,
+): Promise<ReadingProgress> => {
+  const response = await apiClient.put(
+    `/repositories/${repoId}/reading-progress`,
+    {
+      filepath,
+      scroll_ratio: scrollRatio,
+      scroll_top: scrollTop,
+    },
+    {
+      headers: { 'X-Session-Id': sessionId },
+    },
+  )
   return response.data
 }
