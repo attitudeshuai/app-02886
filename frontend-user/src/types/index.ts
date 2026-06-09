@@ -69,3 +69,21 @@ export interface ApiResponse<T> {
 export interface ApiError {
   detail: string
 }
+
+// Reading progress types
+export interface ReadingProgress {
+  id: number
+  session_id: string
+  repository_id: number
+  filepath: string
+  scroll_ratio: number
+  scroll_top: number
+  content_hash: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ReadingProgressGetResponse {
+  progress: ReadingProgress | null
+  reset: boolean
+}

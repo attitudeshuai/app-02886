@@ -6,7 +6,13 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSlug from 'rehype-slug'
 import remarkGfm from 'remark-gfm'
-import { getDocumentContent, exportDocument } from '../api/repositories'
+import {
+  getDocumentContent,
+  exportDocument,
+  getReadingProgress,
+  saveReadingProgress,
+} from '../api/repositories'
+import { getSessionId } from '../api/session'
 import type { DocumentContent } from '../types'
 import { saveAs } from 'file-saver'
 import 'highlight.js/styles/github-dark.css'
@@ -36,10 +42,18 @@ export default function DocPage() {
   // Observer 累积的可见标题集合（提升为 ref 以便清空）
   const visibleIdsRef = useRef(new Set<string>())
 
+  // ====== 阅读进度记忆 ======
+  const sessionIdRef = useRef<string>(getSessionId())
+  // 进度恢复完成前忽略滚动事件，避免立即把"顶部"覆盖刚恢复的位置
+  const progressRestoredRef = useRef(false)
+  const progressSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+
   // 清理
   useEffect(() => {
     return () => {
       if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+      if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current)
       observerRef.current?.disconnect()
     }
   }, [])
@@ -52,6 +66,7 @@ export default function DocPage() {
       setActiveId('')
       setToc([])
       setContentRendered(false)
+      progressRestoredRef.current = false
       try {
         const data = await getDocumentContent(Number(repoId), filepath)
         setDoc(data)
@@ -85,6 +100,89 @@ export default function DocPage() {
     })
     return () => cancelAnimationFrame(raf)
   }, [contentRendered])
+
+  // ========== 恢复阅读进度 ==========
+  useEffect(() => {
+    if (!contentRendered || !repoId || !filepath) return
+    if (progressRestoredRef.current) return
+
+    let cancelled = false
+    const restore = async () => {
+      try {
+        const res = await getReadingProgress(
+          Number(repoId),
+          sessionIdRef.current,
+          filepath,
+        )
+        if (cancelled) return
+
+        const progress = res.progress
+        // 没有保存的进度，或后端因内容变化重置 -> 回到顶部，无需滚动
+        if (!progress) {
+          progressRestoredRef.current = true
+          return
+        }
+
+        // 等待页面布局稳定后再滚动，提高准确性
+        requestAnimationFrame(() => {
+          const docEl = document.documentElement
+          const maxScroll = Math.max(
+            0,
+            docEl.scrollHeight - window.innerHeight,
+          )
+          // 优先使用比例（对内容微调更鲁棒），用绝对像素作为兜底
+          let target = Math.round(progress.scroll_ratio * maxScroll)
+          if (!target && progress.scroll_top > 0) {
+            target = Math.min(progress.scroll_top, maxScroll)
+          }
+          window.scrollTo({ top: target, behavior: 'auto' })
+          progressRestoredRef.current = true
+        })
+      } catch (error) {
+        console.error('Failed to restore reading progress:', error)
+        progressRestoredRef.current = true
+      }
+    }
+    restore()
+
+    return () => {
+      cancelled = true
+    }
+  }, [contentRendered, repoId, filepath])
+
+  // ========== 保存阅读进度（滚动节流） ==========
+  useEffect(() => {
+    if (!repoId || !filepath) return
+
+    const handleScroll = () => {
+      if (!progressRestoredRef.current) return
+      if (progressSaveTimer.current) clearTimeout(progressSaveTimer.current)
+      progressSaveTimer.current = setTimeout(() => {
+        const docEl = document.documentElement
+        const scrollTop = window.scrollY || docEl.scrollTop || 0
+        const maxScroll = Math.max(0, docEl.scrollHeight - window.innerHeight)
+        const ratio = maxScroll > 0 ? scrollTop / maxScroll : 0
+        saveReadingProgress(
+          Number(repoId),
+          sessionIdRef.current,
+          filepath,
+          Math.min(1, Math.max(0, ratio)),
+          Math.max(0, Math.round(scrollTop)),
+        ).catch((err) => {
+          console.error('Failed to save reading progress:', err)
+        })
+      }, 400)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      if (progressSaveTimer.current) {
+        clearTimeout(progressSaveTimer.current)
+        progressSaveTimer.current = null
+      }
+    }
+  }, [repoId, filepath])
 
   // ========== Intersection Observer ==========
   useEffect(() => {
