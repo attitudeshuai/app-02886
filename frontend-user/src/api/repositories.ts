@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { Repository, CreateRepositoryRequest, TreeNode, DocumentContent, SearchResponse } from '../types'
+import type { Repository, CreateRepositoryRequest, TreeNode, DocumentContent, SearchResponse, ReadingProgress } from '../types'
 
 // Repository APIs
 export const getRepositories = async (): Promise<Repository[]> => {
@@ -61,4 +61,61 @@ export const exportRepository = async (repoId: number): Promise<Blob> => {
     responseType: 'blob'
   })
   return response.data
+}
+
+// Reading Progress APIs
+export const getReadingProgress = async (
+  repoId: number,
+  filepath: string,
+  sessionId: string
+): Promise<ReadingProgress | null> => {
+  try {
+    const response = await apiClient.get('/reading-progress', {
+      params: {
+        repository_id: repoId,
+        filepath,
+        session_id: sessionId,
+      },
+    })
+    return response.data
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      return null
+    }
+    throw error
+  }
+}
+
+export const saveReadingProgress = async (
+  repoId: number,
+  filepath: string,
+  sessionId: string,
+  scrollPosition: number
+): Promise<ReadingProgress> => {
+  const response = await apiClient.put(
+    '/reading-progress',
+    { scroll_position: scrollPosition },
+    {
+      params: {
+        repository_id: repoId,
+        filepath,
+        session_id: sessionId,
+      },
+    }
+  )
+  return response.data
+}
+
+export const resetReadingProgress = async (
+  repoId: number,
+  filepath: string,
+  sessionId: string
+): Promise<void> => {
+  await apiClient.delete('/reading-progress', {
+    params: {
+      repository_id: repoId,
+      filepath,
+      session_id: sessionId,
+    },
+  })
 }

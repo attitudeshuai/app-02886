@@ -60,6 +60,16 @@ export interface SearchResponse {
   results: SearchResult[]
 }
 
+// Reading progress types
+export interface ReadingProgress {
+  id: number
+  session_id: string
+  repository_id: number
+  filepath: string
+  scroll_position: number
+  last_read_at: string
+}
+
 // API response types
 export interface ApiResponse<T> {
   data: T
